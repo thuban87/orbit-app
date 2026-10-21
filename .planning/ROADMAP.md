@@ -169,7 +169,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.11: Profile & Contact Forms UX** (INSERTED) - Profile and contact-form audit fixes + new-contact defaults and not-contacted status; one Edit Contact form (Update Contact retired), slimmer + and ⋯, Archive → Bin, one snooze sheet, Birthday tile, Profile backgrounds rework; dossier accepted 2026-10-16
 - [x] **Phase 38.12: People Lifecycle, Import & Settings UX** (INSERTED) - Archive/restore/merge/reconcile, import and Settings audit fixes (completed 2026-10-18)
 - [x] **Phase 38.13: Contacts List, Search & Digest UX** (INSERTED) - Contacts tab, search and Digest audit fixes + list perf investigation, D-95, D-98; dossier pending
-- [ ] **Phase 38.14: Logging, History, Events & Compose UX** (INSERTED) - Logging forms, History, Group Events and Compose audit fixes + one "Did you send it?" (D-76); dossier pending
+- [x] **Phase 38.14: Logging, History, Events & Compose UX** (INSERTED) - Logging forms, History, Group Events and Compose audit fixes + one "Did you send it?" (D-76); dossier pending
 - [ ] **Phase 38.15: Events — Plan, Create & Remind** (INSERTED) - New feature: future group events, an Events-tab create entry and reminders (audit B-23); dossier pending
 - [ ] **Phase 38.16: Share Reminders & Warm Share** (INSERTED) - Offer "Remind me about this" after a share, built on 38.15's reminders; sharing while Orbit is open returns you to Orbit; dossier pending
 - [ ] **Phase 39: Onboarding** - A short guided first run (Welcome → add a first person → a four-step Orient tour) and contextual, skippable lessons for the core loop and a few unusual features, through one accessible lesson system, after the prerequisite product fixes they depend on. Dossier accepted (D-01..D-93); UX audit before planning.
@@ -1776,9 +1776,9 @@ Plans:
 **Depends on**: Phase 38.13
 **Requirements**: None formal. Owner decisions to come from this phase's dossier.
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
-**Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas B, F and J, minus items owned by 38.9 or 38.10; Phase 39's D-76 (39-CONTEXT D-102); B-23's future-date picker cap only (its planning half, B-24 and the Events tab header/empty-state copy are 38.15's). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.14-WORKPAPER-audit-intake.md`.
+**Scope source**: `38.14-CONTEXT.md` (dossier-grade, D-01..D-95). Provisional scope: audit areas B, F and J, minus items owned by 38.9 or 38.10; Phase 39's D-76 (39-CONTEXT D-102); B-23's future-date picker cap only (its planning half, B-24 and the Events tab header/empty-state copy are 38.15's). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.14-WORKPAPER-audit-intake.md`.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 7–9 plans — rough estimate; recurring-problem sweeps not counted.
-**Plans:** 9/9 plans executed
+**Plans:** 9/9 plans executed — completed 2026-10-21
 
 Plans:
 **Wave 1**
