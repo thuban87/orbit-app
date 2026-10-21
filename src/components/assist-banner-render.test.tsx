@@ -158,7 +158,7 @@ describe("AssistBanner photo (38.6 D-25 F-2)", () => {
     ]);
   });
 
-  it("sits the Avatar before the one-line question and the destination line in one row (38.14 D-74)", () => {
+  it("sits the Avatar before the question (up to two lines, D-90) and the one-line destination in one row (38.14 D-74)", () => {
     const tree = render(NEWEST);
     const row = tree.find((node) => {
       if (node.type !== "View") return false;
@@ -180,7 +180,14 @@ describe("AssistBanner photo (38.6 D-25 F-2)", () => {
     const [question, destination] = (column?.props.children ??
       []) as TestElement[];
     expect(textOf(question)).toBe("Did you text Grace Hopper?");
-    expect(question?.props.numberOfLines).toBe(1);
+    // 38.14 D-90: the question may wrap to a second line at large font, and
+    // nothing above it caps the height, so the banner grows to fit.
+    expect(question?.props.numberOfLines).toBe(2);
+    for (const node of [row, column, question]) {
+      const style = flatStyle(node) as Record<string, unknown>;
+      expect(style.height).toBeUndefined();
+      expect(style.maxHeight).toBeUndefined();
+    }
     // Channel, destination (as the contact method writes it, D-79) and time.
     expect(textOf(destination)).toBe("Text to 555-0101 · 9:00 AM");
     expect(destination?.props.numberOfLines).toBe(1);

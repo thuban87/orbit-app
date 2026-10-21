@@ -237,8 +237,11 @@ export function AssistBanner() {
               size={ASSIST_BANNER_AVATAR_SIZE}
             />
             <View style={styles.questionText}>
+              {/* 38.14 D-90: the question may take two lines so a large font
+                keeps the person's name readable instead of cutting it off.
+                The banner's height follows its layout (onLayout below). */}
               <Text
-                numberOfLines={1}
+                numberOfLines={2}
                 style={[styles.question, { color: colors.textPrimary }]}
               >
                 {question}
