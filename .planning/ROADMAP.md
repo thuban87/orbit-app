@@ -1778,7 +1778,7 @@ Plans:
 **Success Criteria**: Defined at planning from this phase's CONTEXT.
 **Scope source**: TBD — dossier via the phase-dossier skill. Provisional scope: audit areas B, F and J, minus items owned by 38.9 or 38.10; Phase 39's D-76 (39-CONTEXT D-102); B-23's future-date picker cap only (its planning half, B-24 and the Events tab header/empty-state copy are 38.15's). Finding list: `.planning/ux-audit/FINDINGS-ASSIGNMENT.md`; intake: `38.14-WORKPAPER-audit-intake.md`.
 **Starting size (scope baseline, CLAUDE.md "Scope growth")**: about 7–9 plans — rough estimate; recurring-problem sweeps not counted.
-**Plans:** 8/9 plans executed
+**Plans:** 9/9 plans executed
 
 Plans:
 **Wave 1**
@@ -1800,7 +1800,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 38.14-09-PLAN.md — Final device plan (after phase code review) + 39-AMENDMENTS-PENDING rows (D-49) + one release build (wave 4)
+- [x] 38.14-09-PLAN.md — Final device plan (after phase code review) + 39-AMENDMENTS-PENDING rows (D-49) + one release build (wave 4)
 
 ### Phase 38.15: Events — Plan, Create & Remind (INSERTED)
 

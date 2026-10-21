@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.14
 current_phase_name: Logging, History, Events & Compose UX
 status: executing
-stopped_at: Completed 38.14-08-PLAN.md
-last_updated: "2026-10-20T20:58:36.284Z"
-last_activity: 2026-10-20
-last_activity_desc: 38.14-08 complete (Events search latest-request with first-load spinner only, Back closes search, clears on close, kept when a result is opened, one reread on refocus; event detail visible Edit Event / Add participants, two-item overflow, empty-state Add participants, sheet re-derived by id, no View Event on its own event; D-84 named add/remove snackbars on event detail via a shared announcer; participant follow lines and card summary name their fields; Edit participant latest-request load)
-state_head: 03bc9e852c90d2416f6e67b28e1ac00456248353
+stopped_at: Completed 38.14-09-PLAN.md
+last_updated: "2026-10-21T07:06:15.403Z"
+last_activity: 2026-10-21
+last_activity_desc: 38.14-09 complete (device pass on the 3a + 6 Pro large-font pass; DEF-1/DEF-2 and owner rulings D-88..D-92 fixed and re-checked; D-49 rows in 39-AMENDMENTS-PENDING; release APK of ad5a92a5 on the Pixel 6 Pro, cold starts clean with empty crash buffer, median cold start 156 ms, no janky scrolling)
+state_head: 7fc26b4ef0296b5da360477980864b93df9ebaf6
 progress:
   total_phases: 38
   completed_phases: 27
   total_plans: 386
-  completed_plans: 382
+  completed_plans: 383
 carried_forward:
 
   - "38.9-38.12 INSERTED (owner 2026-10-10): four UX-audit fix phases before Phase 39 — 38.9 UX standards, 38.10 fuel retirement + Things to Remember + sharing (absorbs 999.3/999.5/999.6; owner: remove fuel, each kind its own Profile section, shares to a chosen section, new shares Allow AI off), 38.11 everyday screens, 38.12 lifecycle/import/Settings. Decimal numbering because the tooling's next-phase order is numeric and ignores Depends-on (checked). Each gets a phase-dossier session; recorded-decision reversals handled per phase (owner). Audit: .planning/ux-audit/UX-AUDIT-REPORT.md; triage vs 39: 39-LEDGER Batch 13."
@@ -497,6 +497,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.14 P05 | 16 min | 3 tasks | 16 files |
 | Phase 38.14 P07 | 16 min | 3 tasks | 17 files |
 | Phase 38.14 P08 | 21 min | 4 tasks | 16 files |
+| Phase 38.14 P09 | 8.5h | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -1176,8 +1177,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-10-20T20:58:30.378Z
-**Stopped at:** Completed 38.14-08-PLAN.md
+**Last session:** 2026-10-21T07:06:09.712Z
+**Stopped at:** Completed 38.14-09-PLAN.md
 _Prior stop:_ 38.13-11 at its owner checkpoint (Task 3 owner batch); partial SUMMARY written
 _Prior stop:_ Completed 38.13-07-PLAN.md (38.13-01 still at its owner checkpoint)
 _Prior stop:_ Completed 38.13-06-PLAN.md
