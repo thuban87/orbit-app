@@ -219,8 +219,22 @@ describe("keyboardLift — a screen's lift above the keyboard (38.14 D-75)", () 
         frameHeight: 800,
         restingFrameHeight: 800,
         keyboardHeight: 300,
+        bottomInset: 0,
       }),
     ).toBe(300);
+  });
+
+  it("adds the navigation-bar inset the keyboard height leaves out (38.14-09 DEF-1)", () => {
+    // Pixel 3a: keyboardDidShow reports the IME inset minus the 16 dp gesture
+    // bar, while Compose's edge-to-edge root reaches the screen bottom.
+    expect(
+      keyboardLift({
+        frameHeight: 807,
+        restingFrameHeight: 807,
+        keyboardHeight: 266,
+        bottomInset: 16,
+      }),
+    ).toBe(282);
   });
 
   it("does not lift when the window already resized for the keyboard", () => {
@@ -229,6 +243,16 @@ describe("keyboardLift — a screen's lift above the keyboard (38.14 D-75)", () 
         frameHeight: 500,
         restingFrameHeight: 800,
         keyboardHeight: 300,
+        bottomInset: 0,
+      }),
+    ).toBe(0);
+    // A resize that absorbed the keyboard and the bar under it leaves no lift.
+    expect(
+      keyboardLift({
+        frameHeight: 484,
+        restingFrameHeight: 800,
+        keyboardHeight: 300,
+        bottomInset: 16,
       }),
     ).toBe(0);
   });
@@ -239,6 +263,7 @@ describe("keyboardLift — a screen's lift above the keyboard (38.14 D-75)", () 
         frameHeight: 800,
         restingFrameHeight: 800,
         keyboardHeight: 0,
+        bottomInset: 16,
       }),
     ).toBe(0);
     expect(
@@ -246,19 +271,21 @@ describe("keyboardLift — a screen's lift above the keyboard (38.14 D-75)", () 
         frameHeight: 0,
         restingFrameHeight: 0,
         keyboardHeight: 300,
+        bottomInset: 16,
       }),
     ).toBe(0);
   });
 
-  it("matches the lift sheetKeyboardLayout computes", () => {
+  it("equals a Sheet's lift plus its bottom safe-area edge", () => {
     const input = {
       frameHeight: 700,
       restingFrameHeight: 800,
       keyboardHeight: 320,
     };
-    expect(keyboardLift(input)).toBe(
+    const bottomInset = 16;
+    expect(keyboardLift({ ...input, bottomInset })).toBe(
       sheetKeyboardLayout({ ...input, variant: "compact", topClearance: 24 })
-        .lift,
+        .lift + bottomInset,
     );
   });
 });

@@ -31,6 +31,13 @@ describe("Compose keeps Copy and Transmit reachable (D-75)", () => {
 
   it("lifts the screen above the keyboard and otherwise clears the gesture bar", () => {
     expect(code).toContain("keyboardLift(");
+    // The keyboard height leaves out the navigation bar; the edge-to-edge root
+    // adds it back (38.14-09 DEF-1).
+    const call = code.slice(
+      code.indexOf("keyboardLift({"),
+      code.indexOf("});", code.indexOf("keyboardLift({")),
+    );
+    expect(call).toContain("bottomInset");
     expect(code).toContain("useFocusedBottomInset(");
     expect(code).toContain('Keyboard.addListener("keyboardDidShow"');
     expect(code).toContain('Keyboard.addListener("keyboardDidHide"');

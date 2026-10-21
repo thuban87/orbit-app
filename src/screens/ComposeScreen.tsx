@@ -336,10 +336,14 @@ export function ComposeScreen({
     restingFrameHeight.current = Math.max(restingFrameHeight.current, height);
     setFrameHeight(height);
   }, []);
+  // The keyboard event's height leaves out the navigation bar, and this root
+  // reaches the screen bottom, so the lift adds the bottom inset back
+  // (38.14-09 DEF-1: the bar sat ~16 dp behind the keyboard).
   const lift = keyboardLift({
     frameHeight,
     restingFrameHeight: restingFrameHeight.current,
     keyboardHeight,
+    bottomInset,
   });
   const rootPaddingBottom = keyboardHeight > 0 ? lift : bottomInset;
   // The message box grows to a font-scale-aware cap, then scrolls inside

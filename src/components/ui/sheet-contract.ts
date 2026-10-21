@@ -96,24 +96,40 @@ export interface KeyboardLiftInput {
   frameHeight: number;
   /** Tallest frame height seen, i.e. the height while the keyboard is down. */
   restingFrameHeight: number;
-  /** Height the keyboard occupies (0 when down). */
+  /**
+   * Height the keyboard occupies above the navigation bar (0 when down): the
+   * `keyboardDidShow` height, which Android reports as the IME inset minus the
+   * system-bar inset (RN `ReactRootView.checkForKeyboardEvents`).
+   */
   keyboardHeight: number;
+  /**
+   * The system-bar inset under the frame's resting bottom (the gesture or
+   * navigation bar; the safe-area bottom inset). An edge-to-edge frame reaches
+   * the screen bottom, so the keyboard's top sits this much higher than
+   * `keyboardHeight` alone says (38.14-09 DEF-1).
+   */
+  bottomInset: number;
 }
 
 /**
  * The bottom padding that keeps a screen's pinned actions above the soft
- * keyboard (38.14 D-75, Compose). The same lift `sheetKeyboardLayout`
- * computes: the part of the keyboard the system did not already absorb by
- * resizing the window, so it is right whether or not the window resized
- * (manifest `adjustResize`, edge-to-edge). 0 with the keyboard down or before
- * the first layout. PURE.
+ * keyboard (38.14 D-75, Compose). The keyboard covers `keyboardHeight` plus the
+ * navigation-bar inset below it, measured from the resting frame bottom; the
+ * lift is the part of that the system did not already absorb by resizing the
+ * window, so it is right whether or not the window resized (manifest
+ * `adjustResize`, edge-to-edge). It replaces the screen's keyboard-down
+ * bottom inset rather than adding to it. The Sheet gets the same total from
+ * `sheetKeyboardLayout`'s lift plus its own bottom safe-area edge. 0 with the
+ * keyboard down or before the first layout. PURE.
  */
 export function keyboardLift({
   frameHeight,
   restingFrameHeight,
   keyboardHeight,
+  bottomInset,
 }: KeyboardLiftInput): number {
   if (keyboardHeight <= 0 || frameHeight <= 0) return 0;
   const resting = Math.max(restingFrameHeight, frameHeight);
-  return Math.max(0, Math.round(keyboardHeight - (resting - frameHeight)));
+  const covered = keyboardHeight + Math.max(0, bottomInset);
+  return Math.max(0, Math.round(covered - (resting - frameHeight)));
 }
